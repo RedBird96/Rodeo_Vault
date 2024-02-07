@@ -54,12 +54,13 @@ contract Vault is
      * @param _exitFeeRate The percentage of exit fee.
      * @param _deleverageExitFeeRate The percentage of exit fee for reducing leverage.
      */
-    function initialize(
+    function __Vault_init(
         uint256 _marketCapacity,
         uint256 _exitFeeRate,
         uint256 _deleverageExitFeeRate
     ) public initializer {
         __Ownable_init();
+        __UUPSUpgradeable_init();
         __ERC20_init("ETH-stETH strategy pool", "roETH");
         __ERC4626_init(WSTETH_CONTRACT);
         // The minimum position size is 100.
@@ -73,7 +74,6 @@ contract Vault is
         lastTimestamp = block.timestamp;
         isAdmin[msg.sender] = true;
     }
-
 
     /**
      * @dev Update the contract address of the strategy pool.

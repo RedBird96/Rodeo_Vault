@@ -59,13 +59,14 @@ contract Strategy is Basic, OneinchCaller {
     /**
      * @dev Initialize various parameters of the Strategy contract.
      */
-    function initialize(
+    function __Strategy_init(
         address _vault,
         address _lendingLogic,
         address _flashloanHelper,
         uint256 _safeAggregatedRatio,
         uint256 _safeRatio
     ) public initializer {
+        __UUPSUpgradeable_init();
         __Ownable_init();
         require(_vault != address(0) && _flashloanHelper != address(0) && _lendingLogic != address(0),
              "Invalid contract address!");
@@ -82,6 +83,8 @@ contract Strategy is Basic, OneinchCaller {
         safeAggregatedRatio = _safeAggregatedRatio;
         isAdmin[msg.sender] = true;
         enterExitProtocol(true);
+        approveToken(WETH_ADDR);
+        approveToken(WSTETH_ADDR);
     }
 
     /**
@@ -333,14 +336,19 @@ contract Strategy is Basic, OneinchCaller {
         (uint8 _module, , uint256 _minimumAmount, bytes memory _swapData) = 
             abi.decode(_params, (uint8, uint256, uint256, bytes));
 
+        console.log("start wsteth balance", IERC20(WSTETH_ADDR).balanceOf(address(this)));
+        console.log("start weth balance", IERC20(WETH_ADDR).balanceOf(address(this)));
         if (_module == uint8(MODULE.LEVERAGE_MODE)) {
 
-            // (uint256 returnAmount_,) =
-            //     executeSwap(_amount, WETH_ADDR, WSTETH_ADDR, _swapData, _minimumAmount);
-            uint256 returnAmount_ = testSwap(_amount, _token, true);
+            (uint256 returnAmount_) =
+                executeSwap(_amount, WETH_ADDR, _swapData, _minimumAmount);
+            // uint256 returnAmount_ = testSwap(_amount, _token, true);
+            console.log("after 1inch swap(weth->wsteth) and wsteth total balance", IERC20(WSTETH_ADDR).balanceOf(address(this)));
             executeDepositWithdraw(WSTETH_ADDR, returnAmount_ + logicDepositAmount, true);
+            console.log("after aave deposit(wsteth) and wsteth balance", IERC20(WSTETH_ADDR).balanceOf(address(this)));
             uint256 borrowAmount = ILendingLogic(lendingLogic).getAvailableBorrowsETH(address(this));
             executeBorrowRepay(_token, borrowAmount, true);
+            console.log("after aave borrow(weth) and weth balance", IERC20(WETH_ADDR).balanceOf(address(this)));
             emit Leverage(returnAmount_ + logicDepositAmount, borrowAmount);
 
         } else {
@@ -356,13 +364,14 @@ contract Strategy is Basic, OneinchCaller {
             executeBorrowRepay(_token, wethWithdrawAmount, false);
             executeDepositWithdraw(WSTETH_ADDR, wethWithdrawAmount, false);
 
-            // executeSwap(_amount, WSTETH_ADDR, WETH_ADDR, _swapData, _minimumAmount);
-            testSwap(_amount, _token, false);
+            executeSwap(_amount, WSTETH_ADDR, _swapData, _minimumAmount);
+            // testSwap(_amount, _token, false);
 
             emit Deleverage(wethWithdrawAmount, _amount);
         }
 
         IERC20(_token).approve(msg.sender, _amount + _fee);
+        console.log("have to pay weth for flashloan(_amount + _fee)", _amount + _fee);
         return CALLBACK_SUCCESS;
     }
 
