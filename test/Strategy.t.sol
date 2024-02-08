@@ -2,6 +2,7 @@
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../src/core/Strategy.sol";
 import "../src/Vault.sol";
@@ -18,8 +19,8 @@ contract StrategyTest is Test {
     Vault public vaultProxy;
     LendingLogic lendingLogic;
     FlashloanHelper flashloaner;
-    TransparentUpgradeableProxy public proxyV;
-    TransparentUpgradeableProxy public proxyS;
+    ERC1967Proxy public proxyV;
+    ERC1967Proxy public proxyS;
     address public owner;
     address public admin;
     uint256 public safeAggreatedRatio;
@@ -37,8 +38,8 @@ contract StrategyTest is Test {
         vm.createSelectFork("https://arb-mainnet.g.alchemy.com/v2/EBq207Wb2kJF6CGEVSTuliPcwlvU1MtE", 173_004_612);
 
         owner = address(0x2ef73f60F33b167dC018C6B1DCC957F4e4c7e936);
-        admin = vm.addr(1);
-
+        admin = vm.addr(1); 
+        // strategyProxy = Strategy(0x79cf424266153Fa373f548D38E2AB2283a8775b7); 
         lendingLogic = new LendingLogic();
         flashloaner = new FlashloanHelper();
 
@@ -51,7 +52,7 @@ contract StrategyTest is Test {
         vault = new Vault();
         strategy = new Strategy();
         vm.prank(owner);
-        proxyV = new TransparentUpgradeableProxy(address(vault), address(owner), "");
+        proxyV = new ERC1967Proxy(address(vault), "");
         vaultProxy = Vault(payable(proxyV));
         vaultProxy.__Vault_init(
             marketCapacity, 
@@ -60,7 +61,7 @@ contract StrategyTest is Test {
         );
 
         vm.prank(owner);
-        proxyS = new TransparentUpgradeableProxy(address(strategy), address(owner), "");
+        proxyS = new ERC1967Proxy(address(strategy), "");
         strategyProxy = Strategy(payable(proxyS));
         strategyProxy.__Strategy_init(
             address(vaultProxy), 
@@ -83,6 +84,7 @@ contract StrategyTest is Test {
         deal(firstUser, 10e18);
         deal(secondUser, 10e18);
 
+        // vm.prank(owner);
         strategyProxy.addAdmin(firstUser);
         vm.startPrank(firstUser);
         IERC20(WSTETH_ADDR).approve(address(vaultProxy), firstdepositAmount);
@@ -93,10 +95,11 @@ contract StrategyTest is Test {
 
         vm.startPrank(firstUser);
 
-        uint256 minimumamount = 17306942369;
+        uint256 minimumamount = 10;
         uint256 stAmount = (firstdepositAmount + seconddepositAmount) * 2;
         uint256 stBalance = IERC20(WSTETH_ADDR).balanceOf(address(strategyProxy));
-        bytes memory _swapData=hex"0502b1c500000000000000000000000082af49447d8a07e3bd95bd0d56f35241523fbab100000000000000000000000000000000000000000000000000000004a817c80000000000000000000000000000000000000000000000000000000003fd4227310000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000180000000000000003b6d0340b0d62768e2fb9bd437a51b993b77b93ac9f249d58b1ccac8";
+        console.log("stBalance", stBalance, stAmount);
+        bytes memory _swapData=hex"0502b1c500000000000000000000000082af49447d8a07e3bd95bd0d56f35241523fbab100000000000000000000000000000000000000000000000000000004a817c80000000000000000000000000000000000000000000000000000000003fe788f800000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000180000000000000003b6d0340b0d62768e2fb9bd437a51b993b77b93ac9f249d58b1ccac8";
         strategyProxy.leverage(
             stBalance, 
             stAmount, 
@@ -104,16 +107,35 @@ contract StrategyTest is Test {
             minimumamount
         );
 
-        // bytes memory _deleverageData = hex"12aa3caf000000000000000000000000e37e799d5077682fa0a244d46e5649f71457bd09000000000000000000000000ae7ab96520de3a18e5e111b5eaab095312d7fe84000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000e37e799d5077682fa0a244d46e5649f71457bd090000000000000000000000003fd49a8f37e2349a29ea701b56f10f03b08f153200000000000000000000000000000000000000000000001bb38cb09b209c000000000000000000000000000000000000000000000000001bb1117e7f9ceb435a000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001730000000000000000000000000000000000000000000001550001270000dd00a007e5c0d20000000000000000000000000000000000000000000000b900006a00005051207f39c581f595b53c5cb19bd0b3f8da6c935e2ca0ae7ab96520de3a18e5e111b5eaab095312d7fe840004ea598cb000000000000000000000000000000000000000000000000000000000000000000020d6bdbf787f39c581f595b53c5cb19bd0b3f8da6c935e2ca000a0fbb7cd060093d199263632a4ef4bb438f1feb99e57b4b5f0bd0000000000000000000005c27f39c581f595b53c5cb19bd0b3f8da6c935e2ca0c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200a0f2fa6b66c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200000000000000000000000000000000000000000000001bb221c154a7f3c2ae0000000000000000000b13a5118a898f80a06c4eca27c02aaa39b223fe8d0a0e5c4f27ead9083c756cc21111111254eeb25477b68fb85ed929f73a96058200000000000000000000000000ea4184f4";
-        // stAmount = 1e10;
-        // IERC20(WETH_ADDR).approve(address(strategyProxy), stAmount * 2);
+        // uint256 afterba = IERC20(WETH_ADDR).balanceOf(address(strategyProxy));
+        // uint256 afterbawst = IERC20(WSTETH_ADDR).balanceOf(address(strategyProxy));
+        // console.log("afterba", afterba);
+        // console.log("afterbawst1", afterbawst);
+        bytes memory _deleverageData = hex"0502b1c50000000000000000000000005979d7b546e38e414f7e9822514be443a4800529000000000000000000000000000000000000000000000000000000000210f35800000000000000000000000000000000000000000000000000000000025bfc910000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000100000000000000003b6d0340e263353986a4638144c41e44cebac9d0a76ecab38b1ccac8";
+        // uint256 withdrawAmt = 1e7;
+        // stAmount = withdrawAmt * 2;
         // strategyProxy.deleverage(
-        //     0, 
+        //     withdrawAmt, 
         //     stAmount, 
         //     _deleverageData, 
         //     minimumamount
         // );
+        // console.log("afterbawst2", IERC20(WSTETH_ADDR).balanceOf(address(strategyProxy)));
 
+        console.log("before bal", IERC20(WSTETH_ADDR).balanceOf(address(firstUser)));
+        uint256 withdrawAmt = 2e7;
+        stAmount = withdrawAmt * 2;
+        vaultProxy.deleverageWithdraw(
+            WSTETH_ADDR, 
+            withdrawAmt, 
+            stAmount, 
+            _deleverageData, 
+            minimumamount, 
+            firstUser, 
+            firstUser
+        );
+
+        console.log("after bal", IERC20(WSTETH_ADDR).balanceOf(address(firstUser )));
         vm.stopPrank();
 
     }

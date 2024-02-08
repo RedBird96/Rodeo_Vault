@@ -27,9 +27,9 @@ interface IStrategy {
     function getAvailableLogicBalance() external view returns (uint256);
     
     function deleverageAndWithdraw(
-        uint8 _protocolId,
-        uint256 _withdrawShare,
+        uint256 _stETHWithdrawAmount,
+        uint256 _wEthDebtDeleverageAmount,
         bytes calldata _swapData,
-        uint256 _swapGetMin
-    ) external returns (uint256);
+        uint256 _minimumAmount
+    ) external returns(uint256);
 }

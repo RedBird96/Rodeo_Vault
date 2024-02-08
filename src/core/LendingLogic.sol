@@ -10,6 +10,8 @@ contract LendingLogic is BasicLogic, ILendingLogic {
 
     using SafeERC20 for IERC20;
     // arbitrum
+    address public constant WETH_ADDR = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+    address public constant WSTETH_ADDR = 0x5979D7b546E38E414F7E9822514be443A4800529;
     address public constant A_WSTETH_ADDR_AAVEV3 = 0x513c7E3a9c69cA3e22550eF58AC1C0088e918FFf;
     address public constant D_WETH_ADDR_AAVEV3 = 0x77CA01483f379E58174739308945f044e1a764dc;
     IAaveOracle public constant AAVE_ORACLE_V3 = IAaveOracle(0xb56c2F0B653B2e0b10C9b928C8580Ac5Df02C7C7);

@@ -232,8 +232,11 @@ contract Strategy is Basic, OneinchCaller {
     }
 
     function getAvailableLogicBalance() external view onlyAdmin returns(uint256 balance) {
-        
         balance = IERC20(WSTETH_ADDR).balanceOf(address(this));
+    }
+
+    function getAssestPrice(address _token) public view returns(uint256 price) {
+        price = AAVE_ORACLE_V3.getAssetPrice(_token);
     }
 
     /**
@@ -278,6 +281,49 @@ contract Strategy is Basic, OneinchCaller {
     * @param _wEthDebtDeleverageAmount wETH amount for debt on flashloan
     * @param _swapData swap bytes data 
     */
+    function deleverageAndWithdraw(
+        uint256 _stETHWithdrawAmount,
+        uint256 _wEthDebtDeleverageAmount,
+        bytes calldata _swapData,
+        uint256 _minimumAmount
+    ) external onlyVault returns(uint256) {
+
+        (uint256 totalAssets,,,) = ILendingLogic(lendingLogic).getNetAssetsInfo(address(this));
+        require(totalAssets >= _wEthDebtDeleverageAmount, "Not enough collaboration");
+
+        uint256 wEthPrice_ = getAssestPrice(WETH_ADDR);
+        uint256 wstEthPrice_ = getAssestPrice(WSTETH_ADDR);
+        uint256 wEthBal = IERC20(WETH_ADDR).balanceOf(address(this));
+        require(_stETHWithdrawAmount * wstEthPrice_ <= wEthBal * wEthPrice_, "Not enough balance");
+
+        logicWithdrawAmount = _stETHWithdrawAmount;
+        bytes memory dataBytes = abi.encode(
+            uint8(MODULE.DELEVERAGE_MODE),
+            _wEthDebtDeleverageAmount,
+            _minimumAmount,
+            _swapData
+        );
+        
+        uint256 beforeBalance = IERC20(WSTETH_ADDR).balanceOf(address(this));
+        IFlashloanHelper(flashloanHelper).flashLoan(
+            IERC3156FlashBorrower(
+                address(this)), 
+                WETH_ADDR, 
+                _wEthDebtDeleverageAmount, 
+                dataBytes
+        );
+        uint256 afterBalance = IERC20(WSTETH_ADDR).balanceOf(address(this));
+        uint256 diffBal = afterBalance - beforeBalance;
+        IERC20(WSTETH_ADDR).safeTransfer(vault, diffBal);
+        return diffBal;
+    }
+
+    /**
+    * @dev adjust position deleverage according the flashloan
+    * @param _stETHWithdrawAmount stETH token withdraw amount
+    * @param _wEthDebtDeleverageAmount wETH amount for debt on flashloan
+    * @param _swapData swap bytes data 
+    */
     function deleverage(
         uint256 _stETHWithdrawAmount,
         uint256 _wEthDebtDeleverageAmount,
@@ -286,7 +332,12 @@ contract Strategy is Basic, OneinchCaller {
     ) external onlyAdmin {
 
         (uint256 totalAssets,,,) = ILendingLogic(lendingLogic).getNetAssetsInfo(address(this));
-        require(totalAssets >= _wEthDebtDeleverageAmount, "Not enough token balance");
+        require(totalAssets >= _wEthDebtDeleverageAmount, "Not enough collaboration");
+
+        uint256 wEthPrice_ = getAssestPrice(WETH_ADDR);
+        uint256 wstEthPrice_ = getAssestPrice(WSTETH_ADDR);
+        uint256 wEthBal = IERC20(WETH_ADDR).balanceOf(address(this));
+        require(_stETHWithdrawAmount * wstEthPrice_ <= wEthBal * wEthPrice_, "Not enough balance");
 
         logicWithdrawAmount = _stETHWithdrawAmount;
         bytes memory dataBytes = abi.encode(
@@ -305,20 +356,6 @@ contract Strategy is Basic, OneinchCaller {
         );
     }
 
-    function testSwap(uint256 amount, address token, bool direct) public returns(uint256 returnAmount) {
-        
-        if (direct) { //wETH -> stETH
-            uint256 price = 9989;
-            returnAmount = amount * price / 10000;
-            IERC20(token).transfer(testSender, amount);
-            IERC20(WSTETH_ADDR).safeTransferFrom(testSender, address(this), returnAmount);
-        } else { //stETH -> wETH
-            uint256 price = 1007;
-            returnAmount = amount * (price / 1000);
-            IERC20(WSTETH_ADDR).transfer(testSender, amount);
-            IERC20(token).safeTransferFrom(testSender, address(this), returnAmount);
-        }
-    }
 
     /**
     * @dev 
@@ -330,7 +367,6 @@ contract Strategy is Basic, OneinchCaller {
         uint256 _fee,
         bytes calldata _params
     ) external returns (bytes32) {
-        
         require(_initiator == address(this), "Cannot call FlashLoan module");
 
         (uint8 _module, , uint256 _minimumAmount, bytes memory _swapData) = 
@@ -353,18 +389,24 @@ contract Strategy is Basic, OneinchCaller {
 
         } else {
             
-            uint256 wEthPrice_ = AAVE_ORACLE_V3.getAssetPrice(WETH_ADDR);
-            uint256 wstEthPrice_ = AAVE_ORACLE_V3.getAssetPrice(WSTETH_ADDR);
+            uint256 wEthPrice_ = getAssestPrice(WETH_ADDR);
+            uint256 wstEthPrice_ = getAssestPrice(WSTETH_ADDR);
 
+            console.log("price", wEthPrice_, wstEthPrice_);
+            console.log("amount + fee", _amount, _fee);
             uint256 wethWithdrawAmount = _amount + _fee;
+            console.log("wethWithdrawAmount", wethWithdrawAmount);
             if (logicWithdrawAmount != 0) {
-                wethWithdrawAmount += logicWithdrawAmount * wstEthPrice_ / wEthPrice_;
+                wethWithdrawAmount += (logicWithdrawAmount + 1 ) * wstEthPrice_ / wEthPrice_;
             }
-
+            console.log("wethWithdrawAmount2", wethWithdrawAmount);
             executeBorrowRepay(_token, wethWithdrawAmount, false);
-            executeDepositWithdraw(WSTETH_ADDR, wethWithdrawAmount, false);
-
-            executeSwap(_amount, WSTETH_ADDR, _swapData, _minimumAmount);
+            uint256 wstWithdrawAmount = wethWithdrawAmount * wEthPrice_ / wstEthPrice_;
+            console.log("before withdraw", IERC20(WSTETH_ADDR).balanceOf(address(this)), wstWithdrawAmount);
+            executeDepositWithdraw(WSTETH_ADDR, wstWithdrawAmount, false);
+            console.log("after withdraw", IERC20(WSTETH_ADDR).balanceOf(address(this)));
+            uint256 wstSwapAmount = (_amount + _fee) * wEthPrice_ / wstEthPrice_;
+            executeSwap(wstSwapAmount, WSTETH_ADDR, _swapData, _minimumAmount);
             // testSwap(_amount, _token, false);
 
             emit Deleverage(wethWithdrawAmount, _amount);

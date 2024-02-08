@@ -45,6 +45,7 @@ contract OneinchCaller {
             swapAmount := mload(add(_swapData, add(0x20, 0x24)))
         }
         require(IERC20(_srcToken) == IERC20(swapSrc), "1inch: Invalid token!");
+        console.log("amount", swapAmount, _amount);
         require(swapAmount >= _amount, "1inch: Invalid input amount!");
         IERC20(_srcToken).approve(oneInchRouter, _amount);
         bytes memory returnData_;
@@ -56,6 +57,7 @@ contract OneinchCaller {
         assembly {
             returnAmount_ := mload(add(returnData_, add(0x20, 0)))
         }
+
         require(returnAmount_ >= _swapGetMin, "1inch: unexpected returnAmount.");
     }
 }

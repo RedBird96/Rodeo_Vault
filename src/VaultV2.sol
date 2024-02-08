@@ -7,10 +7,9 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/lido/IWstETH.sol";
 import "./interfaces/core/IStrategy.sol";
 import "./Basic.sol";
-import {console} from "lib/forge-std/src/console.sol";
 
 
-contract Vault is 
+contract VaultV2 is 
     Basic,
     ERC4626Upgradeable
 {
@@ -34,17 +33,21 @@ contract Vault is
     // Total locked amount
     uint256 public totalLockedAmount;
 
+    uint256 public test;
+
     event UpdateStrategy(address oldStrategy, address newStrategy);
     event UpdateExitFeeRate(uint256 oldExitFeeRate, uint256 newExitFeeRate);
     event UpdateDeleverageExitFeeRate(uint256 oldDeleverageExitFeeRate, uint256 newDeleverageExitFeeRate);
     event UpdateFeeReceiver(address oldFeeReceiver, address newFeeReceiver);
     event UpdateMarketCapacity(uint256 oldCapacityLimit, uint256 newCapacityLimit);
     event DeleverageWithdraw(
+        uint8 protocolId,
         address owner,
         address receiver,
         address token,
         uint256 assetsGet,
-        uint256 shares
+        uint256 shares,
+        uint256 flashloanSelector
     );
 
     /**
@@ -74,6 +77,9 @@ contract Vault is
         isAdmin[msg.sender] = true;
     }
 
+    function testFunction() external {
+        test = 5;
+    }
     /**
      * @dev Update the contract address of the strategy pool.
      * @param _newStrategy The new contract address.
@@ -271,21 +277,23 @@ contract Vault is
     /**
      * @dev When there is insufficient idle funds in the strategy pool,
      * users can opt to withdraw funds and reduce leverage in a specific lending protocol.
+     * @param _protocolId The index number of the lending protocol.
      * @param _token The type of token to be redeemed.
      * @param _assets The original amount of assets that could be redeemed.
-     * @param _wethdebit The debit amount
      * @param _swapData  The calldata for the 1inch exchange operation.
      * @param _swapGetMin The minimum amount of token to be obtained during the 1inch exchange operation.
+     * @param _flashloanSelector The selection of the flash loan protocol.
      * @param _owner The owner of the redeemed share tokens.
      * @param _receiver The address of the recipient for the redeemed assets.
      * @return shares The amount of share tokens obtained.
      */
     function deleverageWithdraw(
+        uint8 _protocolId,
         address _token,
         uint256 _assets,
-        uint256 _wethdebit,
         bytes memory _swapData,
         uint256 _swapGetMin,
+        uint256 _flashloanSelector,
         address _owner,
         address _receiver
     ) external whenNotPaused nonReentrant returns (uint256 shares) {
@@ -295,19 +303,18 @@ contract Vault is
             require(_assets <= maxWithdraw(_owner), "ERC4626: withdraw more than max");
         }
         shares = previewWithdraw(_assets);
-        // uint256 assetsAfterFee_ = _assets - getDeleverageWithdrawFee(_assets);
-        // if (msg.sender != _owner) {
-        //     _spendAllowance(_owner, msg.sender, shares);
-        // }
+        uint256 assetsAfterFee_ = _assets - getDeleverageWithdrawFee(_assets);
+        if (msg.sender != _owner) {
+            _spendAllowance(_owner, msg.sender, shares);
+        }
 
         uint256 assetsGet_ = strategy.deleverageAndWithdraw(
-            _assets, _wethdebit, _swapData, _swapGetMin
+            _protocolId, assetsAfterFee_, _swapData, _swapGetMin
         );
-        console.log("assetsGet_", assetsGet_);
         _burn(_owner, shares);
         IWstETH(WSTETH_ADDR).safeTransfer(_receiver, assetsGet_);
 
-        emit DeleverageWithdraw(_owner, _receiver, _token, assetsGet_, shares);
+        emit DeleverageWithdraw(_protocolId, _owner, _receiver, _token, assetsGet_, shares, _flashloanSelector);
     }
 
     /**

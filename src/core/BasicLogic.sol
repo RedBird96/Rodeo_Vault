@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "../Basic.sol";
 
-abstract contract BasicLogic is Basic {
+abstract contract BasicLogic {
     address public immutable LOGIC_ADDRESS;
 
     constructor() {
