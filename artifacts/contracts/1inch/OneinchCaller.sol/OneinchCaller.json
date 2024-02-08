@@ -1,0 +1,37 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "OneinchCaller",
+  "sourceName": "contracts/1inch/OneinchCaller.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "ETH_ADDR",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "oneInchRouter",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080604052348015600f57600080fd5b5060bd8061001e6000396000f3fe6080604052348015600f57600080fd5b506004361060325760003560e01c80637753f47b146037578063ac3af20814606d575b600080fd5b605173eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee81565b6040516001600160a01b03909116815260200160405180910390f35b6051731111111254eeb25477b68fb85ed929f73a9605828156fea2646970667358221220598daadf13bd6b32fd8d8f450dda4382375a7404b77d7a68a098254527289d4864736f6c63430008130033",
+  "deployedBytecode": "0x6080604052348015600f57600080fd5b506004361060325760003560e01c80637753f47b146037578063ac3af20814606d575b600080fd5b605173eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee81565b6040516001600160a01b03909116815260200160405180910390f35b6051731111111254eeb25477b68fb85ed929f73a9605828156fea2646970667358221220598daadf13bd6b32fd8d8f450dda4382375a7404b77d7a68a098254527289d4864736f6c63430008130033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
